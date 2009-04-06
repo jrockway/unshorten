@@ -5,6 +5,8 @@ use HTTP::Engine::Role; # for type constraints
 use feature 'say';
 
 class Unshorten with MooseX::Getopt with MooseX::Runnable with HTTP::Engine::Role {
+    use TryCatch;
+
     has '_engine_type' => ( is => 'ro', default => 'POE' );
 
     has 'dsn' => (
@@ -30,20 +32,21 @@ class Unshorten with MooseX::Getopt with MooseX::Runnable with HTTP::Engine::Rol
 
         my $short = URI->new(substr $req->uri->path, 1);
 
-        my $long = eval { $self->model->unshorten($short) };
-        if(!$long || $@){
+        try {
+            my $long = $self->model->unshorten($short) or die 'No long URL returned.';
+            return HTTP::Engine::Response->new(
+                content_type => 'text/plain',
+                body         => $long,
+            );
+        }
+        catch($msg) {
             $self->model->delete("$short"); # just to make sure bad data doesn't stay
             return HTTP::Engine::Response->new(
                 code         => 500,
                 content_type => 'text/plain',
-                body         => "An error occurred while shortening '$short': $@",
+                body         => "An error occurred while shortening '$short': $msg",
             );
         }
-
-        return HTTP::Engine::Response->new(
-            content_type => 'text/plain',
-            body         => $long,
-        );
     }
 
     method run() {

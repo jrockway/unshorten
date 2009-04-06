@@ -1,7 +1,6 @@
 use MooseX::Declare;
 
 class Unshorten::Model extends KiokuX::Model {
-    use Moose::Util::TypeConstraints;
     use MooseX::Types::URI qw(Uri);
 
     use AnyEvent::HTTP qw(http_head);
