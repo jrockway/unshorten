@@ -32,6 +32,7 @@ class Unshorten with MooseX::Getopt with MooseX::Runnable with HTTP::Engine::Rol
 
         my $long = eval { $self->model->unshorten($short) };
         if(!$long || $@){
+            $self->model->delete("$short"); # just to make sure bad data doesn't stay
             return HTTP::Engine::Response->new(
                 code         => 500,
                 content_type => 'text/plain',

@@ -7,39 +7,40 @@ class Unshorten::Model extends KiokuX::Model {
     use AnyEvent::HTTP qw(http_head);
 
     method unshorten(Uri $url) {
-        return $self->_lookup_or_cache($url, sub {
-            $self->_lookup(@_),
+        return $self->_resolve_or_cache($url, sub {
+            $self->_resolve_url(@_),
         });
     }
 
-    method _lookup(Uri $url) {
+    method _resolve_url(Uri $url) {
         my $done = AnyEvent->condvar;
 
         http_head $url, sub {
             my ($data, $headers) = @_;
             my $long_url = eval { URI->new($headers->{URL}) };
-            confess 'Failed to get a URL' unless $url;
+            confess 'Failed to get a URL' unless $long_url;
             $done->send($long_url);
         };
 
         return $done->recv;
     }
 
-    method _lookup_or_cache(Uri $url, CodeRef $shortener) {
+    method _resolve_or_cache(Uri $url, CodeRef $expander) {
         my $scope = $self->new_scope;
-        my $shortened = $self->lookup("$url");
-        return $shortened if $shortened;
+        my $expanded = $self->lookup("$url");
+        return $expanded->{redirects_to} if $expanded;
 
-        $shortened = $shortener->($url);
+        # needs to be expanded
+        $expanded = $expander->($url);
 
         # "Unknown reason" because the shortener should die if it knows
         # the reason
         confess "Unable to shorten '$url': Unknown reason"
-          unless $shortened;
+          unless $expanded;
 
-        $self->store("$url" => $shortened);
+        $self->insert("$url" => { redirects_to => $expanded });
 
-        return $shortened;
+        return $expanded;
     }
 
 };
